@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prototipo SIGTurnos-HNAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: barra superior con las tres vistas del sistema; cada vista simula su dispositivo real (quiosco, TV de sala, consola web) sobre una cola compartida en memoria. */
+:root{
+  --bg:#eef2f4; --surface:#ffffff; --ink:#14232c; --muted:#5b6b75; --line:#cdd7dd;
+  --brand:#0e5a6e; --brand-ink:#ffffff; --call:#f2a516; --call-ink:#1d1300;
+  --ok:#1f7a4d; --warn:#b4581b; --bad:#b3262d; --soft:#e2ecef;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Atkinson Hyperlegible",Verdana,Arial,sans-serif;
+  --mono:"IBM Plex Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1519; --surface:#16232a; --ink:#e6eef1; --muted:#9db0b9; --line:#2a3b44;
+  --brand:#2f8fa6; --brand-ink:#04161c; --call:#f5b335; --call-ink:#1d1300;
+  --ok:#4cbf86; --warn:#e58d4f; --bad:#ef6a70; --soft:#1d2f37; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1519; --surface:#16232a; --ink:#e6eef1; --muted:#9db0b9; --line:#2a3b44;
+  --brand:#2f8fa6; --brand-ink:#04161c; --call:#f5b335; --call-ink:#1d1300;
+  --ok:#4cbf86; --warn:#e58d4f; --bad:#ef6a70; --soft:#1d2f37; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;margin:0}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 32px;max-width:1180px;margin:0 auto}
+header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.brand{display:flex;flex-direction:column}
+.brand b{font-family:var(--display);font-size:1.7rem;letter-spacing:.02em;line-height:1}
+.brand span{color:var(--muted);font-size:.85rem}
+nav.tabs{display:flex;gap:6px;flex-wrap:wrap}
+nav.tabs a{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:700;font-size:.92rem;background:var(--surface)}
+nav.tabs a[aria-current="page"]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+nav.tabs a:focus-visible,button:focus-visible{outline:3px solid var(--call);outline-offset:2px}
+.note{font-size:.85rem;color:var(--muted);margin:0 0 14px}
+.view[hidden]{display:none!important}
+button{font-family:var(--body);cursor:pointer}
+
+/* ---------- Quiosco ---------- */
+.kiosk-stage{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+.kiosk{background:#1c2a31;border-radius:22px;padding:18px;box-shadow:0 12px 30px rgb(0 0 0 / .18)}
+.kscreen{background:var(--surface);border-radius:10px;min-height:520px;padding:22px;display:flex;flex-direction:column;gap:14px}
+.khead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.khead h2{margin:0;font-family:var(--display);font-size:2rem;text-wrap:balance}
+.steps{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.kgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.kbtn{display:flex;align-items:center;gap:14px;text-align:left;min-height:84px;padding:14px 16px;border-radius:12px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font-size:1.15rem;font-weight:700}
+.kbtn:hover{border-color:var(--brand);background:var(--soft)}
+.kbtn .pf{flex:none;width:46px;height:46px;border-radius:10px;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-family:var(--display);font-size:1.6rem}
+.kbtn small{display:block;font-weight:400;font-size:.85rem;color:var(--muted)}
+.kbtn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);justify-content:center}
+.help{margin-top:auto;align-self:stretch;border:2px dashed var(--bad);color:var(--bad);background:transparent;border-radius:12px;padding:12px;font-weight:700;font-size:1rem}
+.ticket{align-self:center;width:min(320px,100%);background:#fffdf6;color:#1b1b1b;border-radius:6px;padding:20px 18px;text-align:center;font-family:var(--mono);box-shadow:0 6px 18px rgb(0 0 0 / .15);border-top:8px dotted #c9c3b3}
+.ticket .code{font-family:var(--display);font-size:4.4rem;line-height:1;margin:8px 0}
+.ticket .meta{font-size:.82rem;line-height:1.6}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h3{margin:0 0 8px;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.qlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-variant-numeric:tabular-nums}
+.qlist li{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:.88rem}
+.pill{font-family:var(--body);font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--ink);white-space:nowrap}
+.pill.prio{background:var(--call);color:var(--call-ink)}
+.pill.ok{background:var(--ok);color:#fff}.pill.bad{background:var(--bad);color:#fff}
+
+/* ---------- Pantalla pública ---------- */
+.tv{background:#0b1418;border-radius:14px;padding:12px;box-shadow:0 12px 30px rgb(0 0 0 / .25)}
+.tvin{background:#102028;color:#f2f6f7;border-radius:6px;overflow:hidden;display:flex;flex-direction:column;min-height:520px}
+.tvbar{display:flex;justify-content:space-between;gap:10px;padding:10px 18px;background:#0e5a6e;font-weight:700;flex-wrap:wrap}
+.tvmain{flex:1;display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+.called{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;border-right:2px solid #24414d}
+.called .lbl{letter-spacing:.14em;text-transform:uppercase;color:#a9c4cc;font-size:.95rem}
+.called .num{font-family:var(--display);font-size:clamp(4rem,13vw,9rem);line-height:.95;color:#f5b335}
+.called .dest{font-family:var(--display);font-size:clamp(2rem,6vw,3.6rem);line-height:1}
+.called.flash .num{animation:flash 1s ease 2}
+@keyframes flash{50%{color:#fff;transform:scale(1.04)}}
+@media (prefers-reduced-motion: reduce){.called.flash .num{animation:none}}
+.last{padding:16px;min-width:0}
+.last h4{margin:0 0 10px;letter-spacing:.1em;text-transform:uppercase;font-size:.85rem;color:#a9c4cc}
+.last table{color:#f2f6f7;width:100%;border-collapse:collapse;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.last td{padding:8px 4px;border-bottom:1px solid #24414d}
+.last td:first-child{font-family:var(--display);font-size:1.6rem;color:#f5b335}
+.tvfoot{padding:10px 18px;background:#0a171c;color:#cfe0e5;font-size:.95rem;display:flex;flex-wrap:wrap;gap:6px 22px}
+.tvfoot b{color:#fff}
+
+/* ---------- Consola ---------- */
+.console{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:16px}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+select{font:inherit;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.current .code{font-family:var(--display);font-size:4.2rem;line-height:1}
+.current .info{color:var(--muted);font-size:.9rem;font-variant-numeric:tabular-nums}
+.actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.act{padding:12px 8px;border-radius:10px;border:2px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:.95rem}
+.act:hover{border-color:var(--brand)}
+.act.go{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.act.no{border-color:var(--bad);color:var(--bad)}
+.act:disabled{opacity:.45;cursor:not-allowed}
+table.q{width:100%;border-collapse:collapse;font-size:.92rem;font-variant-numeric:tabular-nums}
+table.q th{text-align:left;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--line);padding:6px 4px}
+table.q td{padding:7px 4px;border-bottom:1px solid var(--line)}
+table.q td.c{font-family:var(--mono)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:16px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+.kpi span{display:block;font-size:.78rem;color:var(--muted)}
+.kpi b{font-family:var(--display);font-size:2.1rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi.alert{border-color:var(--warn)} .kpi.alert b{color:var(--warn)}
+.log{font-family:var(--mono);font-size:.8rem;color:var(--muted);max-height:150px;overflow:auto;margin:0;padding:0;list-style:none}
+.toast{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;font-weight:700;opacity:0;transition:opacity .2s}
+.toast.on{opacity:1}
+
+@media (max-width:860px){
+  .kiosk-stage,.console{grid-template-columns:minmax(0,1fr)}
+  .tvmain{grid-template-columns:minmax(0,1fr)}
+  .called{border-right:0;border-bottom:2px solid #24414d}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:520px){ .kgrid{grid-template-columns:minmax(0,1fr)} .actions{grid-template-columns:repeat(2,minmax(0,1fr))} .kscreen{min-height:0} }
+
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><b>SIGTurnos-HNAL</b><span>Prototipo navegable · Hospital Traumatológico Dr Reyes</span></div>
+    <nav class="tabs" aria-label="Vistas del prototipo">
+      <a href="#quiosco" data-v="quiosco">1 · Quiosco</a>
+      <a href="#pantalla" data-v="pantalla">2 · Pantalla de sala</a>
+      <a href="#consola" data-v="consola">3 · Consola del operador</a>
+    </nav>
+  </header>
+  <p class="note">Prototipo de demostración para la defensa del TFG. Los turnos de la cola son datos de ejemplo; las tres vistas comparten la misma cola, así que un turno emitido en el quiosco aparece en la consola y, al llamarlo, en la pantalla de sala.</p>
+
+  <!-- QUIOSCO -->
+  <section class="view" id="v-quiosco">
+    <div class="kiosk-stage">
+      <div class="kiosk"><div class="kscreen" id="kscreen"></div></div>
+      <aside class="side">
+        <div class="card"><h3>Cómo usarlo</h3>
+          <p style="margin:0;font-size:.92rem">Toque un servicio, indique si es usuario prioritario y obtenga el ticket. Luego vaya a la consola para llamarlo.</p></div>
+        <div class="card"><h3>Turnos en espera</h3><ul class="qlist" id="kq"></ul></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- PANTALLA -->
+  <section class="view" id="v-pantalla" hidden>
+    <div class="tv"><div class="tvin">
+      <div class="tvbar"><span>Hospital Traumatológico Dr Reyes</span><span id="clock">--:--</span></div>
+      <div class="tvmain">
+        <div class="called" id="called">
+          <div class="lbl">Turno llamado</div>
+          <div class="num" id="tvnum">—</div>
+          <div class="lbl" style="margin-top:6px">Pase a</div>
+          <div class="dest" id="tvdest">—</div>
+        </div>
+        <div class="last"><h4>Últimos llamados</h4><table><tbody id="tvlast"></tbody></table>
+          <p style="font-size:.8rem;color:#a9c4cc;margin-top:12px">Solo se muestra el código del turno, nunca el nombre del paciente (Ley 172-13).</p></div>
+      </div>
+      <div class="tvfoot" id="tvfoot"></div>
+    </div></div>
+    <div class="ctrl" style="margin-top:12px"><button class="act" id="voiceBtn" type="button">Activar aviso por voz</button><span class="note" style="margin:0">El navegador permite el sonido solo después de un clic.</span></div>
+  </section>
+
+  <!-- CONSOLA -->
+  <section class="view" id="v-consola" hidden>
+    <div class="ctrl">
+      <label for="svcSel"><b>Servicio</b></label>
+      <select id="svcSel"></select>
+      <label for="posSel"><b>Puesto</b></label>
+      <select id="posSel"></select>
+    </div>
+    <div class="console">
+      <div class="card current">
+        <h3>Turno en atención</h3>
+        <div class="code" id="curCode">—</div>
+        <div class="info" id="curInfo">Pulse «Llamar siguiente» para atender al próximo paciente.</div>
+        <div class="actions">
+          <button class="act go" id="aNext" type="button">Llamar siguiente</button>
+          <button class="act" id="aRecall" type="button">Re-llamar</button>
+          <button class="act" id="aTransfer" type="button">Transferir</button>
+          <button class="act" id="aPause" type="button">Pausar puesto</button>
+          <button class="act no" id="aAbsent" type="button">Ausente</button>
+          <button class="act" id="aDone" type="button">Finalizar</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Turnos en espera · <span id="qcount">0</span></h3>
+        <div style="overflow-x:auto"><table class="q"><thead><tr><th>Turno</th><th>Prioridad</th><th>Canal</th><th>Espera</th></tr></thead><tbody id="qtable"></tbody></table></div>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><span>En espera (todos los servicios)</span><b id="kWait">0</b></div>
+      <div class="kpi" id="kAvgBox"><span>Espera promedio en cola</span><b id="kAvg">0 min</b></div>
+      <div class="kpi"><span>Atendidos hoy</span><b id="kDone">0</b></div>
+      <div class="kpi"><span>Ausentes</span><b id="kAbs">0</b></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h3>Bitácora de eventos (base de los indicadores)</h3><ul class="log" id="log"></ul></div>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+const SERVICES=[
+  {id:'A',name:'Admisión y registro',hint:'Primera vez o actualización de datos',pos:['Ventanilla 1','Ventanilla 2','Ventanilla 3'],next:'F'},
+  {id:'F',name:'Facturación y caja',hint:'Validación de ARS y pagos',pos:['Caja 1','Caja 2'],next:'C'},
+  {id:'C',name:'Consulta de Ortopedia',hint:'Pacientes con cita del día',pos:['Consultorio 7','Consultorio 12'],next:null},
+  {id:'N',name:'Consulta de Neurocirugía',hint:'Pacientes con cita del día',pos:['Consultorio 15'],next:null},
+  {id:'L',name:'Laboratorio',hint:'Toma de muestras',pos:['Toma 1'],next:null},
+  {id:'I',name:'Imágenes',hint:'Rayos X, tomografía, sonografía',pos:['Recepción de imágenes'],next:null}
+];
+const PRIOS=['Adulto mayor (65+)','Embarazada','Persona con discapacidad'];
+const svc=id=>SERVICES.find(s=>s.id===id);
+const now=()=>Date.now();
+let counters={A:111,F:63,C:44,N:12,L:30,I:21};
+let queue=[], history=[], served=0, absent=0, current=null, log=[];
+function mk(sid,prio,channel,minsAgo,origin){
+  counters[sid]++;
+  const code=(prio?'P':sid)+'-'+String(counters[sid]).padStart(3,'0');
+  return {code,sid,prio,channel,t:now()-minsAgo*60000,origin:origin||null};
+}
+// cola de ejemplo
+[['A',null,'Quiosco',34],['A','Adulto mayor (65+)','Asistido',6],['A',null,'Quiosco',31],['A',null,'Quiosco',28],['A','Persona con discapacidad','Quiosco',3],
+ ['F',null,'Encadenado',12],['F',null,'Encadenado',9],['C',null,'Encadenado',40],['C','Embarazada','Encadenado',15],['C',null,'Encadenado',22],['N',null,'Encadenado',18],['L',null,'Quiosco',7]]
+ .forEach(r=>queue.push(mk(...r)));
+history=[{code:'C-044',dest:'Consultorio 7'},{code:'F-063',dest:'Caja 2'},{code:'A-111',dest:'Ventanilla 2'},{code:'P-008',dest:'Ventanilla 1'}];
+served=186; absent=4;
+
+const $=id=>document.getElementById(id);
+const mins=t=>Math.max(0,Math.round((now()-t)/60000));
+function addLog(msg){const d=new Date();log.unshift(d.toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit',second:'2-digit'})+'  '+msg);log=log.slice(0,40);renderLog()}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),1800)}
+function waitingFor(sid){return queue.filter(q=>q.sid===sid).sort((a,b)=>(!!b.prio-!!a.prio)||(a.t-b.t))}
+function estimate(sid){const n=waitingFor(sid).length;return {n,min:Math.max(3,n*4)}}
+
+/* ---- Quiosco ---- */
+let kState={step:1,sid:null,ticket:null};
+function renderKiosk(){
+  const k=$('kscreen');
+  if(kState.step===1){
+    k.innerHTML=`<div class="khead"><h2>Bienvenido. Toque el servicio que necesita</h2><span class="steps">Paso 1 de 3</span></div>
+      <div class="kgrid">${SERVICES.map(s=>`<button class="kbtn" data-s="${s.id}" type="button"><span class="pf">${s.id}</span><span>${s.name}<small>${s.hint}</small></span></button>`).join('')}</div>
+      <button class="help" type="button" id="helpBtn">¿Necesita ayuda? Toque aquí y un orientador vendrá a asistirle</button>`;
+    k.querySelectorAll('.kbtn').forEach(b=>b.onclick=()=>{kState={step:2,sid:b.dataset.s};renderKiosk()});
+  } else if(kState.step===2){
+    const s=svc(kState.sid);
+    k.innerHTML=`<div class="khead"><h2>${s.name}</h2><span class="steps">Paso 2 de 3</span></div>
+      <p style="margin:0;font-size:1.2rem">¿Pertenece a alguno de estos grupos? Tendrá atención preferencial.</p>
+      <div class="kgrid">${PRIOS.map(p=>`<button class="kbtn" data-p="${p}" type="button"><span class="pf">P</span><span>${p}</span></button>`).join('')}
+      <button class="kbtn primary" data-p="" type="button">Ninguno · Continuar</button></div>
+      <button class="help" type="button" id="backBtn" style="border-color:var(--line);color:var(--muted)">‹ Volver a servicios</button>`;
+    k.querySelectorAll('.kbtn').forEach(b=>b.onclick=()=>{
+      const prio=b.dataset.p||null;const t=mk(kState.sid,prio,'Quiosco',0);queue.push(t);
+      addLog(`EMISIÓN ${t.code} · ${s.name}${prio?' · '+prio:''} · quiosco`);
+      kState={step:3,sid:kState.sid,ticket:t};renderAll();renderKiosk();
+    });
+    $('backBtn').onclick=()=>{kState={step:1};renderKiosk()};
+  } else {
+    const t=kState.ticket,s=svc(t.sid);const ahead=waitingFor(t.sid).findIndex(q=>q.code===t.code);const est=Math.max(3,ahead*4);
+    const d=new Date(t.t);
+    k.innerHTML=`<div class="khead"><h2>Retire su ticket</h2><span class="steps">Paso 3 de 3</span></div>
+      <div class="ticket"><div>HOSPITAL DR REYES</div><div>${s.name.toUpperCase()}</div><div class="code">${t.code}</div>
+      <div class="meta">Personas antes de usted: ${ahead}<br>Espera estimada: ${est} min<br>${d.toLocaleDateString('es-DO')} · ${d.toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'})}${t.prio?'<br>ATENCIÓN PREFERENCIAL':''}</div></div>
+      <p style="margin:0;text-align:center">Espere sentado. Su turno aparecerá en las pantallas de la sala.</p>
+      <div class="kgrid"><button class="kbtn" id="smsBtn" type="button"><span class="pf">✉</span><span>Avisarme por SMS<small>Requiere su consentimiento</small></span></button>
+      <button class="kbtn primary" id="endBtn" type="button">Terminar</button></div>`;
+    $('smsBtn').onclick=()=>{addLog(`CONSENTIMIENTO SMS ${t.code}`);toast('Le enviaremos un SMS cuando falten 3 turnos')};
+    $('endBtn').onclick=()=>{kState={step:1};renderKiosk()};
+  }
+  const hb=$('helpBtn'); if(hb) hb.onclick=()=>{addLog('SOLICITUD DE AYUDA en quiosco 1');toast('Un orientador viene en camino')};
+}
+function renderKQ(){
+  const items=SERVICES.map(s=>({s,n:waitingFor(s.id).length}));
+  $('kq').innerHTML=items.map(({s,n})=>`<li><span>${s.name}</span><span class="pill">${n} · ~${estimate(s.id).min} min</span></li>`).join('');
+}
+
+/* ---- Pantalla ---- */
+function renderTV(){
+  const h=history[0];$('tvnum').textContent=h?h.code:'—';$('tvdest').textContent=h?h.dest.toUpperCase():'—';
+  $('tvlast').innerHTML=history.slice(1,6).map(x=>`<tr><td>${x.code}</td><td>${x.dest}</td></tr>`).join('');
+  $('tvfoot').innerHTML=['A','F','C'].map(id=>`<span>Espera estimada · ${svc(id).name.split(' ')[0]==='Consulta'?'Ortopedia':svc(id).name.split(' ')[0]}: <b>${estimate(id).min} min</b></span>`).join('');
+}
+let voice=false;
+$('voiceBtn').onclick=()=>{voice=!voice;$('voiceBtn').textContent=voice?'Aviso por voz activado':'Activar aviso por voz';if(voice)announce(history[0])};
+function announce(h){
+  if(!h)return;const c=$('called');c.classList.remove('flash');void c.offsetWidth;c.classList.add('flash');
+  if(!voice)return;
+  try{const ctx=new (window.AudioContext||window.webkitAudioContext)();[880,660].forEach((f,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=f;o.connect(g);g.connect(ctx.destination);g.gain.setValueAtTime(.2,ctx.currentTime+i*.35);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+i*.35+.3);o.start(ctx.currentTime+i*.35);o.stop(ctx.currentTime+i*.35+.32)})}catch(e){}
+  try{const [p,n]=h.code.split('-');const u=new SpeechSynthesisUtterance(`Turno ${p} ${Number(n)}, ${h.dest}`);u.lang='es-ES';setTimeout(()=>speechSynthesis.speak(u),700)}catch(e){}
+}
+setInterval(()=>{$('clock').textContent=new Date().toLocaleTimeString('es-DO',{hour:'2-digit',minute:'2-digit'})},1000);
+
+/* ---- Consola ---- */
+const svcSel=$('svcSel'),posSel=$('posSel');
+svcSel.innerHTML=SERVICES.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+function fillPos(){posSel.innerHTML=svc(svcSel.value).pos.map(p=>`<option>${p}</option>`).join('')}
+svcSel.onchange=()=>{fillPos();renderConsole()};fillPos();
+let paused=false;
+function call(t){
+  current=t;queue=queue.filter(q=>q!==t);current.calls=1;current.callT=now();
+  history.unshift({code:t.code,dest:posSel.value});history=history.slice(0,8);
+  addLog(`LLAMADO ${t.code} → ${posSel.value} · esperó ${mins(t.t)} min`);announce(history[0]);
+}
+$('aNext').onclick=()=>{
+  if(paused){toast('El puesto está en pausa');return}
+  if(current){toast('Finalice o marque ausente el turno actual');return}
+  const w=waitingFor(svcSel.value);if(!w.length){toast('No hay turnos en espera para este servicio');return}
+  call(w[0]);renderAll();
+};
+$('aRecall').onclick=()=>{if(!current)return;current.calls++;history.unshift({code:current.code,dest:posSel.value});addLog(`RE-LLAMADO ${current.code} (${current.calls}.º llamado)`);announce(history[0]);renderAll()};
+$('aAbsent').onclick=()=>{if(!current)return;absent++;addLog(`AUSENCIA ${current.code} tras ${current.calls} llamado(s)`);current=null;renderAll()};
+$('aDone').onclick=()=>{
+  if(!current)return;served++;const s=svc(current.sid);
+  addLog(`FINALIZACIÓN ${current.code} · ${s.name}`);
+  if(s.next){const n=mk(s.next,current.prio,'Encadenado',0,current.code);queue.push(n);addLog(`ENCADENAMIENTO ${current.code} → ${n.code} (${svc(s.next).name})`);toast(`Turno ${n.code} generado para ${svc(s.next).name}`)}
+  current=null;renderAll();
+};
+$('aTransfer').onclick=()=>{
+  if(!current)return;const s=svc(current.sid);const to=s.next||'A';const n=mk(to,current.prio,'Encadenado',0,current.code);queue.push(n);
+  addLog(`TRANSFERENCIA ${current.code} → ${n.code} (${svc(to).name})`);toast(`Transferido a ${svc(to).name}`);current=null;renderAll();
+};
+$('aPause').onclick=()=>{paused=!paused;$('aPause').textContent=paused?'Reanudar puesto':'Pausar puesto';addLog(`${paused?'PAUSA':'REANUDACIÓN'} ${posSel.value}`)};
+function renderConsole(){
+  $('curCode').textContent=current?current.code:'—';
+  $('curInfo').textContent=current?`${svc(current.sid).name} · esperó ${mins(current.t)} min · canal: ${current.channel}${current.prio?' · '+current.prio:''}${current.origin?' · viene de '+current.origin:''}`:'Pulse «Llamar siguiente» para atender al próximo paciente.';
+  ['aRecall','aAbsent','aDone','aTransfer'].forEach(id=>$(id).disabled=!current);
+  const w=waitingFor(svcSel.value);$('qcount').textContent=w.length;
+  $('qtable').innerHTML=w.map(q=>`<tr><td class="c">${q.code}</td><td>${q.prio?`<span class="pill prio">${q.prio}</span>`:'—'}</td><td>${q.channel}</td><td>${mins(q.t)} min</td></tr>`).join('')||'<tr><td colspan="4">No hay turnos en espera.</td></tr>';
+  $('kWait').textContent=queue.length;
+  const avg=queue.length?Math.round(queue.reduce((a,q)=>a+mins(q.t),0)/queue.length):0;
+  $('kAvg').textContent=avg+' min';$('kAvgBox').classList.toggle('alert',avg>15);
+  $('kDone').textContent=served;$('kAbs').textContent=absent;
+}
+function renderLog(){$('log').innerHTML=log.map(l=>`<li>${l}</li>`).join('')||'<li>Sin eventos todavía.</li>'}
+function renderAll(){renderKQ();renderTV();renderConsole();renderLog();if(kState.step!==3)renderKiosk()}
+
+/* ---- Navegación ---- */
+function route(){
+  const v=(location.hash||'#quiosco').slice(1);const ok=['quiosco','pantalla','consola'].includes(v)?v:'quiosco';
+  ['quiosco','pantalla','consola'].forEach(x=>$('v-'+x).hidden=x!==ok);
+  document.querySelectorAll('nav.tabs a').forEach(a=>{if(a.dataset.v===ok)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')});
+}
+window.addEventListener('hashchange',route);
+addLog('Sistema iniciado con cola de ejemplo');
+renderKiosk();renderAll();route();
+
+</script>
+</body>
+</html>
